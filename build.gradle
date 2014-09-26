@@ -1,0 +1,141 @@
+apply plugin: 'groovy'
+apply plugin: 'idea'
+apply plugin: 'java'
+
+apply plugin: 'jetty'
+apply plugin: 'gwt'
+apply plugin: 'war'
+
+group = 'com.xebialabs.jackrabbit.explorer'
+version = '1.0'
+
+//Settings
+def gwtWarPath = 'war'
+def gwtModule = 'com.priocept.jcr.JackrabbitExplorer'
+def gwtStartupUrl = 'JackrabbitExplorer.html'
+
+def gwtServerHost = 'localhost'
+def gwtServerPort = 8888
+
+ext {
+  jackrabbitVersion = "2.6.0"
+  smartGwtVersion = "2.2"
+  gwtVersion = "2.2.0"
+}
+
+repositories {
+  mavenCentral()
+  maven { url 'http://www.smartclient.com/maven2' }
+}
+
+buildscript {
+  repositories {
+    maven {
+      url 'http://dl.bintray.com/steffenschaefer/maven'
+    }
+    mavenCentral()
+  }
+
+  dependencies {
+    classpath 'de.richsource.gradle.plugins:gwt-gradle-plugin:0.5'
+  }
+}
+
+gwt {
+  gwtVersion = '2.2.0'
+  modules 'com.priocept.jcr.JackrabbitExplorer'
+}
+
+repositories {
+  jcenter()
+  mavenCentral()
+}
+
+dependencies {
+  compile "org.apache.jackrabbit:jackrabbit-api:${jackrabbitVersion}"
+  compile "org.apache.jackrabbit:jackrabbit-core:${jackrabbitVersion}"
+  compile "org.apache.jackrabbit:jackrabbit-jcr-commons:${jackrabbitVersion}"
+  compile "org.apache.jackrabbit:jackrabbit-jcr-rmi:${jackrabbitVersion}"
+  compile "org.apache.jackrabbit:jackrabbit-jcr-server:${jackrabbitVersion}"
+  compile "org.apache.jackrabbit:jackrabbit-jcr-servlet:${jackrabbitVersion}"
+  compile "org.apache.jackrabbit:jackrabbit-spi:${jackrabbitVersion}"
+  compile "org.apache.jackrabbit:jackrabbit-spi-commons:${jackrabbitVersion}"
+
+  compile "com.smartgwt:smartgwt:${smartGwtVersion}"
+  compile "com.smartgwt:smartgwt-skins:${smartGwtVersion}"
+  compile "com.google.gwt:gwt-user:${gwtVersion}"
+  compile "com.google.gwt:gwt-dev:${gwtVersion}"
+
+  // Needed for GWT compile and at runtime for RequestBuilder
+  // Specify two artifacts as workaround for GRADLE-1934
+  compile('javax.validation:validation-api:1.0.0.GA') {
+    artifact {
+      name = 'validation-api'
+      type = 'jar'
+    }
+    artifact {
+      name = 'validation-api'
+      type = 'jar'
+      classifier = 'sources'
+    }
+  }
+
+  compile "javax.jcr:jcr:2.0"
+  compile "com.sun.xml.messaging.saaj:saaj-impl:1.3.2"
+  compile "javax.activation:activation:1.1.1"
+
+  testCompile "junit:junit:4.8.2"
+}
+
+task gwtc(dependsOn: classes, type: JavaExec) {
+  description = "GWT compile to JavaScript (production mode)"
+
+  main = 'com.google.gwt.dev.Compiler'
+
+  classpath {
+    [
+        sourceSets.main.java.srcDirs,           // Java source
+        sourceSets.main.output.resourcesDir,    // Generated resources
+        sourceSets.main.output.classesDir,      // Generated classes
+        sourceSets.main.compileClasspath,       // Deps
+    ]
+  }
+
+
+  args = [
+      gwtModule,
+      '-war', gwtWarPath
+  ]
+
+  maxHeapSize = '256M'
+}
+
+task devmode(dependsOn: classes, type: JavaExec) {
+
+  description = "Run development mode"
+
+  main = 'com.google.gwt.dev.DevMode'
+
+  classpath {
+    [
+        sourceSets.main.java.srcDirs,           // Java source
+        sourceSets.main.output.resourcesDir,    // Generated resources
+        sourceSets.main.output.classesDir,      // Generated classes
+        sourceSets.main.compileClasspath,       // Deps
+        configurations.compile
+    ]
+  }
+
+  args = (gwtModule instanceof List) ? gwtModule : [gwtModule]
+  args += [
+      '-startupUrl', "http://${gwtServerHost}:${gwtServerPort}/${gwtStartupUrl}",
+      '-war', gwtWarPath
+  ]
+
+  maxHeapSize = '256M'
+}
+
+war.dependsOn gwtc
+war {
+  from gwtWarPath
+}
