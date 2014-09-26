@@ -300,6 +300,19 @@ public class JcrServiceImpl extends RemoteServiceServlet implements JcrService {
         return returnList;
     }
 
+    private void processPropertyValues(Map<String, String> properties, Property property, Value propertyValue) throws RepositoryException {
+        //added a Binary Value text to the jcr:data property, as displaying raw binary in the value cell isn't desirable
+        if (null != property.getName() && property.getName().equalsIgnoreCase("jcr:data")) {
+            properties.put(property.getName() + " (Click to open)", "Binary Value");
+
+            //Any property of value which starts with http:// will be openable in the frontend
+        } else if (null != propertyValue && propertyValue.getString().startsWith("http://")) {
+            properties.put(property.getName() + " (Click to open)", propertyValue.getString());
+        } else if (propertyValue != null) {
+            properties.put(property.getName(), propertyValue.toString());
+        }
+    }
+
     /*
      * Used to gather a list of the children of the node at the given path (parent node)
      * @see com.priocept.client.JcrService#getNode(java.lang.String)
@@ -331,18 +344,12 @@ public class JcrServiceImpl extends RemoteServiceServlet implements JcrService {
 
                     Property property = propertyIterator.nextProperty();
 
-                    for (Value propertyValue : property.getValues()) {
-
-                        //added a Binary Value text to the jcr:data property, as displaying raw binary in the value cell isn't desirable
-                        if (null != property.getName() && property.getName().equalsIgnoreCase("jcr:data")) {
-                            properties.put(property.getName() + " (Click to open)", "Binary Value");
-
-                            //Any property of value which starts with http:// will be openable in the frontend
-                        } else if (null != propertyValue && propertyValue.getString().startsWith("http://")) {
-                            properties.put(property.getName() + " (Click to open)", propertyValue.getString());
-                        } else if (propertyValue != null) {
-                            properties.put(property.getName(), propertyValue.toString());
+                    if (property.isMultiple()) {
+                        for (Value propertyValue : property.getValues()) {
+                            processPropertyValues(properties, property, propertyValue);
                         }
+                    } else {
+                        processPropertyValues(properties, property, property.getValue());
                     }
                 }
                 if (node.getPath().contains("[") && node.getPath().contains("]")) {
@@ -686,8 +693,7 @@ public class JcrServiceImpl extends RemoteServiceServlet implements JcrService {
 
     /**
      * @param sourcePath
-     * @param property
-//     * @param value
+     * @param property   //     * @param value
      * @return String success message
      * @throws SerializedException
      */
@@ -778,7 +784,7 @@ public class JcrServiceImpl extends RemoteServiceServlet implements JcrService {
 
         //TODO Fix registering custom node types
         /*
-		 * Can't be done over RMI at this stage
+         * Can't be done over RMI at this stage
 		 * Cannot cast ClientNodeTypeManager to JackrabbitNodeTypeManager or NodeTypeManagerImpl
 		 * 
 		 * Also, JCR2.0 javax.jcr.nodetype.NodeTypeManager.registerNodeType is unimplemented 
